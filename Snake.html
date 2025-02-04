@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #1e5799, #7db9e8);
+            color: #fff;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 25px;
+            text-align: center;
+        }
+
+        canvas {
+            background-color: #1d1d1d;
+            width: 65vh;
+            border: 1px solid #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        #score {
+            margin-top: 10px;
+        }
+
+        #level {
+            margin-top: 10px;
+        }
+    </style>
+    <title>Snake Game With Realistic Snake and Animated Food</title>
+</head>
+
+<body>
+    <canvas id="snakeCanvas" width="400" height="400"></canvas>
+    <div id="score-container">
+        <div id="score">Score: <span>0</span></div>
+        <div id="high-score">High Score: <span>0</span></div>
+        <div id="level">Level: <span>1</span></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20;
+        const canvasSize = canvas.width / gridSize;
+        let snake = [{ x: 10, y: 10 }];
+        let direction = 'right';
+        let food = getRandomFood();
+        let score = 0;
+        let highScore = 0;
+        let level = 1;
+        let speed = 200;
+        let initialSpeed = speed;
+        let foodAnimationCounter = 0;
+        let obstacles = []; // Array to store obstacle positions
+
+        // Function to draw the snake with more realistic body
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                // Adding gradient effect for a more realistic snake body
+                let gradient = ctx.createRadialGradient(
+                    (segment.x * gridSize) + gridSize / 2,
+                    (segment.y * gridSize) + gridSize / 2,
+                    0,
+                    (segment.x * gridSize) + gridSize / 2,
+                    (segment.y * gridSize) + gridSize / 2,
+                    gridSize / 2
+                );
+                gradient.addColorStop(0, '#6e9e4a');
+                gradient.addColorStop(1, '#1c4d29');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(segment.x * gridSize + gridSize / 2, segment.y * gridSize + gridSize / 2, gridSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (index === 0) drawEyes(segment.x, segment.y); // Draw eyes for the head
+            });
+        }
+
+        // Function to draw the snake's eyes
+        function drawEyes(x, y) {
+            ctx.fillStyle = '#ffffff';
+            let eyeSize = 4;
+            let eyeOffset = 4;
+            let eye1, eye2;
+
+            switch (direction) {
+                case 'up':
+                    eye1 = { x: x * gridSize + eyeOffset, y: y * gridSize + 4 };
+                    eye2 = { x: x * gridSize + gridSize - eyeOffset - eyeSize, y: y * gridSize + 4 };
+                    break;
+                case 'down':
+                    eye1 = { x: x * gridSize + eyeOffset, y: y * gridSize + gridSize - 8 };
+                    eye2 = { x: x * gridSize + gridSize - eyeOffset - eyeSize, y: y * gridSize + gridSize - 8 };
+                    break;
+                case 'left':
+                    eye1 = { x: x * gridSize + 4, y: y * gridSize + eyeOffset };
+                    eye2 = { x: x * gridSize + 4, y: y * gridSize + gridSize - eyeOffset - eyeSize };
+                    break;
+                case 'right':
+                    eye1 = { x: x * gridSize + gridSize - 8, y: y * gridSize + eyeOffset };
+                    eye2 = { x: x * gridSize + gridSize - 8, y: y * gridSize + gridSize - eyeOffset - eyeSize };
+                    break;
+            }
+
+            ctx.fillRect(eye1.x, eye1.y, eyeSize, eyeSize);
+            ctx.fillRect(eye2.x, eye2.y, eyeSize, eyeSize);
+        }
+
+        // Function to draw the food with glowing effect
+        function drawFood() {
+            let color1 = '#ff0000';
+            let color2 = '#ffcc00';
+            let color = foodAnimationCounter % 20 < 10 ? color1 : color2;
+
+            // Adding glowing effect to food
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(food.x * gridSize + gridSize / 2, food.y * gridSize + gridSize / 2, gridSize / 2, 0, Math.PI * 2);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#fff'; // Glow effect
+            ctx.fill();
+            ctx.shadowBlur = 0; // Reset shadow after drawing food
+
+            foodAnimationCounter++;
+        }
+
+        // Function to get random food position
+        function getRandomFood() {
+            return {
+                x: Math.floor(Math.random() * canvasSize),
+                y: Math.floor(Math.random() * canvasSize)
+            };
+        }
+
+        // Function to move the snake
+        function moveSnake() {
+            const head = { ...snake[0] };
+
+            switch (direction) {
+                case 'up': head.y--; break;
+                case 'down': head.y++; break;
+                case 'left': head.x--; break;
+                case 'right': head.x++; break;
+            }
+
+            if (head.x < 0 || head.x >= canvasSize || head.y < 0 || head.y >= canvasSize || checkCollision(head) || checkObstacleCollision(head)) {
+                resetGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                food = getRandomFood();
+                score++;
+                updateScore();
+                increaseSpeed();
+                checkLevelUp();
+            } else {
+                snake.pop();
+            }
+        }
+
+        // Function to check collision with snake itself
+        function checkCollision(head) {
+            return snake.some(segment => segment.x === head.x && segment.y === head.y);
+        }
+
+        // Function to check collision with obstacles
+        function checkObstacleCollision(head) {
+            return obstacles.some(obstacle => obstacle.x === head.x && obstacle.y === head.y);
+        }
+
+        // Function to increase speed based on score
+        function increaseSpeed() {
+            speed = Math.max(50, initialSpeed - Math.floor(score / 5) * 5);
+        }
+
+        // Function to update the score
+        function updateScore() {
+            document.querySelector('#score span').innerText = score;
+            if (score > highScore) {
+                highScore = score;
+                document.querySelector('#high-score span').innerText = highScore;
+            }
+        }
+
+        // Function to check for level-up
+        function checkLevelUp() {
+            const targetScoreForNextLevel = level * 5; // Level up every 5 points
+            if (score >= targetScoreForNextLevel) {
+                level++;
+                speed = Math.max(50, speed - 20); // Increase speed by reducing delay
+                document.querySelector('#level span').innerText = level;
+
+                // Add obstacles as the level increases
+                addObstacles(level);
+            }
+        }
+
+        // Function to add obstacles based on the level
+        function addObstacles(level) {
+            obstacles = []; // Reset obstacles each level
+            for (let i = 0; i < level; i++) {
+                let obstacleX = Math.floor(Math.random() * canvasSize);
+                let obstacleY = Math.floor(Math.random() * canvasSize);
+                obstacles.push({ x: obstacleX, y: obstacleY });
+            }
+        }
+
+        // Function to draw obstacles
+        function drawObstacles() {
+            ctx.fillStyle = '#ff00ff'; // Obstacle color
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x * gridSize, obstacle.y * gridSize, gridSize, gridSize);
+            });
+        }
+
+        // Function to draw everything on the canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawSnake();
+            drawFood();
+            drawObstacles();
+        }
+
+        // Function to reset the game
+        function resetGame() {
+            alert(`Game Over! Score Anda: ${score}`);
+            snake = [{ x: 10, y: 10 }];
+            direction = 'right';
+            food = getRandomFood();
+            score = 0;
+            level = 1;
+            speed = initialSpeed;
+            obstacles = [];
+            updateScore();
+            document.querySelector('#level span').innerText = level;
+        }
+
+        // Game loop function
+        function gameLoop() {
+            moveSnake();
+            draw();
+            setTimeout(gameLoop, speed);
+        }
+
+        // Event listener for keydown to control snake direction
+        document.addEventListener('keydown', (event) => {
+            switch (event.key) {
+                case 'ArrowUp': if (direction !== 'down') direction = 'up'; break;
+                case 'ArrowDown': if (direction !== 'up') direction = 'down'; break;
+                case 'ArrowLeft': if (direction !== 'right') direction = 'left'; break;
+                case 'ArrowRight': if (direction !== 'left') direction = 'right'; break;
+            }
+        });
+
+        gameLoop();
+    </script>
+</body>
+
+</html>
